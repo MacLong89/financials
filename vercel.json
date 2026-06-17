@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "stockscanner/web/app.py": {
-      "maxDuration": 60
-    }
-  }
-}
