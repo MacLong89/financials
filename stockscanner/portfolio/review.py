@@ -7,19 +7,9 @@ from typing import Any
 
 from stockscanner.config import ScannerConfig, resolve_cache_dir
 from stockscanner.data import fetch_benchmark, fetch_bulk_history, fetch_history
-from stockscanner.filters import build_base_candidate
-from stockscanner.indicators import pct_return, rs_percentile
+from stockscanner.eval_context import build_evaluated_candidate, build_evaluation_context
 from stockscanner.plan import build_trade_plan
 from stockscanner.regime import RegimeStatus, evaluate_regime
-from stockscanner.scoring import score_candidate
-from stockscanner.sectors import (
-    build_sector_map,
-    sector_momentum_returns,
-    sector_percentile_ranks,
-)
-from stockscanner.signals.breakout import detect_breakout
-from stockscanner.signals.empirical import build_signal_context, evaluate_empirical_signals
-from stockscanner.signals.pullback import detect_pullback
 from stockscanner.universe import get_universe
 
 
@@ -154,21 +144,7 @@ def run_portfolio_review(
                 history[sym] = df
 
     signals_cfg = cfg.signals
-    sector_map = build_sector_map(list(history.keys()), cache_dir)
-    im_lb = int(signals_cfg.get("industry_momentum", {}).get("sector_lookback_days", 63))
-    sector_rets = sector_momentum_returns(history, sector_map, im_lb)
-    sector_rank = sector_percentile_ranks(sector_rets)
-    ctx = build_signal_context(history, sector_map, sector_rank, signals_cfg)
-
-    jt_returns = {
-        sym: pct_return(history[sym]["Close"], int(signals_cfg.get("jt_momentum", {}).get("lookback_days", 126)))
-        for sym in history
-    }
-    jt_returns = {k: v for k, v in jt_returns.items() if v is not None}
-    jt_pct_map = rs_percentile(jt_returns)
-
-    breakout_cfg = cfg.breakout
-    pullback_cfg = cfg.pullback
+    eval_ctx = build_evaluation_context(history, cfg, cache_dir)
     reviews: list[HoldingReview] = []
 
     for sym in parsed:
@@ -191,27 +167,25 @@ def run_portfolio_review(
             )
             continue
 
-        empirical = evaluate_empirical_signals(
+        candidate = build_evaluated_candidate(
             sym,
             df,
+            eval_ctx=eval_ctx,
             regime=regime,
-            ctx=ctx,
-            config=signals_cfg,
-            pead_enabled_runtime=not skip_pead,
+            config=cfg,
+            skip_pead=skip_pead,
         )
-        rs_pct = jt_pct_map.get(sym, 0.0)
-        candidate = build_base_candidate(sym, df, rs_pct)
         if candidate is None:
             reviews.append(
                 HoldingReview(
                     symbol=sym,
                     rating="—",
                     confidence=0.0,
-                    signal_count=empirical.pass_count,
-                    signals=empirical.codes,
+                    signal_count=0,
+                    signals="-",
                     price=float(df["Close"].iloc[-1]),
                     above_200ma=False,
-                    rs_percentile=rs_pct,
+                    rs_percentile=0.0,
                     ratio_52w=0.0,
                     reason="Insufficient indicator data",
                     error="indicators",
@@ -219,28 +193,10 @@ def run_portfolio_review(
             )
             continue
 
-        candidate.signals = empirical
-        bo = detect_breakout(
-            df,
-            base_min_days=int(breakout_cfg.get("base_min_days", 10)),
-            base_max_days=int(breakout_cfg.get("base_max_days", 20)),
-            base_max_range_pct=float(breakout_cfg.get("base_max_range_pct", 0.08)),
-            volume_multiplier=float(breakout_cfg.get("volume_multiplier", 1.5)),
-        )
-        pb = detect_pullback(
-            df,
-            ema_period=int(pullback_cfg.get("ema_period", 20)),
-            touch_tolerance_pct=float(pullback_cfg.get("touch_tolerance_pct", 0.02)),
-            require_green_candle=bool(pullback_cfg.get("require_green_candle", True)),
-            volume_multiplier=float(pullback_cfg.get("volume_multiplier", 1.0)),
-        )
-        candidate.setup_breakout = bo.triggered
-        candidate.setup_pullback = pb.triggered
-        candidate.score = score_candidate(candidate)
         plan = build_trade_plan(candidate)
 
         rating, reason = _rate_holding(
-            signal_count=empirical.pass_count,
+            signal_count=candidate.signal_count,
             confidence=plan.confidence_exact,
             above_200ma=candidate.above_200ma,
             regime=regime,
@@ -251,8 +207,8 @@ def run_portfolio_review(
                 symbol=sym,
                 rating=rating,
                 confidence=plan.confidence_exact,
-                signal_count=empirical.pass_count,
-                signals=empirical.codes,
+                signal_count=candidate.signal_count,
+                signals=candidate.signals.codes,
                 price=candidate.last_close,
                 above_200ma=candidate.above_200ma,
                 rs_percentile=candidate.rs_percentile,

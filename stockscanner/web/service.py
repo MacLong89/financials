@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import threading
 from datetime import datetime, timezone
 from typing import Any
@@ -107,7 +106,6 @@ def _result_to_payload(
             "match_count": len(result.candidates),
             "plan_count": len(plans),
         },
-        "vercel_mode": result.vercel_mode,
         "plan_rules": {
             "stop_pct": float(plan_cfg.get("stop_pct", 0.075)),
             "reward_risk": float(plan_cfg.get("reward_risk", 2.0)),
@@ -137,7 +135,7 @@ def run_and_store(
         _scanning = True
 
     try:
-        skip_pead = fast or bool(os.environ.get("VERCEL"))
+        skip_pead = fast
         result = run_scan(cfg, skip_pead=skip_pead)
         payload = _result_to_payload(result, cfg, fast=fast, source=source)
         save_scan(payload)

@@ -200,12 +200,7 @@ function renderDashboard(payload) {
     : "—";
 
   $("last-scan").textContent = fmtTime(payload.ran_at);
-  if (payload.vercel_mode) {
-    const n = payload.stats?.universe_size ?? "—";
-    $("scan-source").textContent = `${payload.source || "manual"} · liquid S&P subset (${n} names)`;
-  } else {
-    $("scan-source").textContent = payload.source ? `via ${payload.source}` : "—";
-  }
+  $("scan-source").textContent = payload.source ? `via ${payload.source}` : "—";
   $("match-count").textContent = `${stats.match_count ?? "—"} / ${stats.plan_count ?? "—"}`;
 
   const stopPct = ((rules.stop_pct || 0) * 100).toFixed(1);
@@ -239,12 +234,6 @@ function renderPortfolio(data) {
   $("pf-ok-count").textContent = `${summary.strong_hold || 0} / ${summary.hold || 0}`;
   $("pf-risk-count").textContent = `Trim ${summary.trim || 0} · Exit ${summary.exit || 0} · Watch ${summary.watch || 0}`;
   $("pf-last-review").textContent = fmtTime(data.ran_at);
-  const reviewMeta = $("pf-last-review").closest(".card")?.querySelector(".meta");
-  if (reviewMeta) {
-    reviewMeta.textContent = data.vercel_mode
-      ? "Ranked vs ~90 liquid S&P names (localhost uses full 500)"
-      : "Ranked vs full S&P 500 universe";
-  }
   $("pf-count").textContent = data.symbol_count ?? holdings.length;
 
   const regime = data.regime || {};
