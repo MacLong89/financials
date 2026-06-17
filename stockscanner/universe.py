@@ -13,6 +13,7 @@ from stockscanner.config import data_dir
 
 
 WIKI_SP500_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+BUNDLED_SP500 = Path(__file__).resolve().parent / "data" / "sp500_symbols.json"
 
 # ~90 liquid S&P leaders — used on Vercel to stay within serverless timeouts.
 LIQUID_SP500: tuple[str, ...] = (
@@ -39,6 +40,11 @@ def fetch_sp500_symbols() -> list[str]:
         mtime = datetime.fromtimestamp(cache.stat().st_mtime, tz=timezone.utc)
         if datetime.now(timezone.utc) - mtime < timedelta(hours=24):
             return json.loads(cache.read_text(encoding="utf-8"))
+
+    if BUNDLED_SP500.exists():
+        out = json.loads(BUNDLED_SP500.read_text(encoding="utf-8"))
+        cache.write_text(json.dumps(out), encoding="utf-8")
+        return out
 
     headers = {"User-Agent": "stockscanner/0.1 (momentum swing scanner)"}
     response = requests.get(WIKI_SP500_URL, headers=headers, timeout=30)

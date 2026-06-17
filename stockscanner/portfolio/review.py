@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -133,21 +132,11 @@ def run_portfolio_review(
         require_above=bool(regime_cfg.get("require_above", True)),
     )
 
-    if os.environ.get("VERCEL"):
-        # Full S&P 500 exceeds serverless timeouts; use liquid subset for peer ranks.
-        liquid = get_universe(
-            cfg.universe.get("vercel_source", "sp500_liquid"),
-            cfg.universe.get("custom_symbols", []),
-        )
-        all_symbols = sorted(set(parsed) | set(liquid) | {benchmark})
-        vercel_mode = True
-    else:
-        universe = get_universe(
-            cfg.universe.get("source", "sp500"),
-            cfg.universe.get("custom_symbols", []),
-        )
-        all_symbols = sorted(set(universe) | set(parsed))
-        vercel_mode = False
+    universe = get_universe(
+        cfg.universe.get("source", "sp500"),
+        cfg.universe.get("custom_symbols", []),
+    )
+    all_symbols = sorted(set(universe) | set(parsed))
     history = fetch_bulk_history(
         all_symbols,
         cache_dir=cache_dir,
@@ -292,5 +281,5 @@ def run_portfolio_review(
         "holdings": [r.__dict__ for r in reviews],
         "summary": summary,
         "symbol_count": len(parsed),
-        "vercel_mode": vercel_mode,
+        "universe_size": len(all_symbols),
     }

@@ -27,6 +27,7 @@ include = ["stockscanner*"]
 
 [tool.setuptools.package-data]
 "stockscanner.web" = ["static/*"]
+"stockscanner" = ["data/*.json"]
 
 [tool.vercel]
 entrypoint = "app:app"

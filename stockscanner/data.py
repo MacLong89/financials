@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import pickle
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -64,6 +65,51 @@ def _store_history_frame(
     return df
 
 
+def _download_chunk(
+    chunk: list[str],
+    *,
+    cache_dir: Path,
+    period: str,
+) -> dict[str, pd.DataFrame]:
+    frames: dict[str, pd.DataFrame] = {}
+    if not chunk:
+        return frames
+
+    try:
+        data = yf.download(
+            chunk,
+            period=period,
+            auto_adjust=True,
+            group_by="ticker",
+            threads=True,
+            progress=False,
+        )
+    except Exception:
+        for sym in chunk:
+            df = fetch_history(sym, cache_dir=cache_dir, max_age_hours=0, period=period)
+            if df is not None:
+                frames[sym] = df
+        return frames
+
+    if len(chunk) == 1:
+        sym = chunk[0]
+        df = _extract_ticker_frame(data, sym)
+        if df is not None:
+            stored = _store_history_frame(sym, df, cache_dir=cache_dir)
+            if stored is not None:
+                frames[sym] = stored
+        return frames
+
+    for sym in chunk:
+        df = _extract_ticker_frame(data, sym)
+        if df is None:
+            continue
+        stored = _store_history_frame(sym, df, cache_dir=cache_dir)
+        if stored is not None:
+            frames[sym] = stored
+    return frames
+
+
 def fetch_history(
     symbol: str,
     *,
@@ -112,48 +158,30 @@ def fetch_bulk_history(
                 pass
         need_fetch.append(sym)
 
-    chunk_size = 35 if os.environ.get("VERCEL") else 60
-    for i in range(0, len(need_fetch), chunk_size):
-        chunk = need_fetch[i : i + chunk_size]
-        if not chunk:
-            continue
-        try:
-            data = yf.download(
-                chunk,
-                period=period,
-                auto_adjust=True,
-                group_by="ticker",
-                threads=True,
-                progress=False,
-            )
-        except Exception:
-            for sym in chunk:
-                df = fetch_history(
-                    sym,
+    chunk_size = 80
+    chunks = [need_fetch[i : i + chunk_size] for i in range(0, len(need_fetch), chunk_size)]
+    if not chunks:
+        return frames
+
+    workers = min(4, len(chunks)) if os.environ.get("VERCEL") else 1
+    if workers > 1:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [
+                pool.submit(
+                    _download_chunk,
+                    chunk,
                     cache_dir=cache_dir,
-                    max_age_hours=max_age_hours,
                     period=period,
                 )
-                if df is not None:
-                    frames[sym] = df
-            continue
-
-        if len(chunk) == 1:
-            sym = chunk[0]
-            df = _extract_ticker_frame(data, sym)
-            if df is not None:
-                stored = _store_history_frame(sym, df, cache_dir=cache_dir)
-                if stored is not None:
-                    frames[sym] = stored
-            continue
-
-        for sym in chunk:
-            df = _extract_ticker_frame(data, sym)
-            if df is None:
-                continue
-            stored = _store_history_frame(sym, df, cache_dir=cache_dir)
-            if stored is not None:
-                frames[sym] = stored
+                for chunk in chunks
+            ]
+            for future in as_completed(futures):
+                frames.update(future.result())
+    else:
+        for chunk in chunks:
+            frames.update(
+                _download_chunk(chunk, cache_dir=cache_dir, period=period),
+            )
 
     return frames
 
