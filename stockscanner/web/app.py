@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -42,7 +43,7 @@ class SessionRequest(BaseModel):
 @app.on_event("startup")
 def on_startup() -> None:
     web_cfg = _config.section("web")
-    if web_cfg.get("auto_schedule", True):
+    if web_cfg.get("auto_schedule", True) and not os.environ.get("VERCEL"):
         start_scheduler(_config)
         logger.info("Scheduler started")
 

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from stockscanner.config import ScannerConfig
+from stockscanner.config import ScannerConfig, resolve_cache_dir
 from stockscanner.data import fetch_benchmark, fetch_bulk_history, fetch_history
 from stockscanner.filters import build_base_candidate
 from stockscanner.indicators import pct_return, rs_percentile
@@ -103,9 +103,7 @@ def run_portfolio_review(
     cfg = config or ScannerConfig.load()
     pf_cfg = cfg.section("portfolio")
     output_cfg = cfg.output
-    cache_dir = Path(output_cfg.get("cache_dir", "data/cache"))
-    if not cache_dir.is_absolute():
-        cache_dir = Path(__file__).resolve().parent.parent.parent / cache_dir
+    cache_dir = resolve_cache_dir()
 
     parsed = _parse_symbols(symbols)
     if not parsed:

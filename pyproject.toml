@@ -1,0 +1,8 @@
+[project]
+name = "financials"
+version = "1.0.0"
+description = "Empirical swing scanner with portfolio hold ratings"
+requires-python = ">=3.11"
+
+[tool.vercel]
+entrypoint = "stockscanner.web.app:app"

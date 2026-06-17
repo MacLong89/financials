@@ -6,17 +6,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from stockscanner.config import ROOT
+from stockscanner.config import data_dir
 
 
-SCANS_DIR = ROOT / "data" / "scans"
+SCANS_DIR = data_dir() / "scans"
 LATEST_FILE = SCANS_DIR / "latest.json"
 INTRADAY_LATEST = SCANS_DIR / "intraday_latest.json"
-USER_DIR = ROOT / "data" / "user"
+USER_DIR = data_dir() / "user"
 PORTFOLIO_FILE = USER_DIR / "portfolio.json"
 PORTFOLIO_REVIEW_FILE = USER_DIR / "portfolio_review.json"
 SESSION_FILE = USER_DIR / "session.json"
-_LEGACY_PORTFOLIO_FILE = ROOT / "data" / "portfolio.json"
+_LEGACY_PORTFOLIO_FILE = data_dir() / "portfolio.json"
 
 
 def _ensure_user_dir() -> None:

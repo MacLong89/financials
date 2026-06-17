@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,27 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = ROOT / "config.yaml"
+
+
+def data_dir() -> Path:
+    """Writable app data directory (uses /tmp on Vercel serverless)."""
+    base = Path("/tmp/stockscanner/data") if os.environ.get("VERCEL") else ROOT / "data"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def resolve_cache_dir(path: Path | None = None) -> Path:
+    cfg = ScannerConfig.load(path)
+    output_cfg = cfg.section("output")
+    cache_dir = Path(output_cfg.get("cache_dir", "data/cache"))
+    if cache_dir.is_absolute():
+        resolved = cache_dir
+    elif os.environ.get("VERCEL"):
+        resolved = data_dir() / "cache"
+    else:
+        resolved = ROOT / cache_dir
+    resolved.mkdir(parents=True, exist_ok=True)
+    return resolved
 
 
 @dataclass(frozen=True)

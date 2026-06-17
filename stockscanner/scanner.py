@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from stockscanner.config import ScannerConfig
+from stockscanner.config import ScannerConfig, resolve_cache_dir
 from stockscanner.data import fetch_benchmark, fetch_bulk_history
 from stockscanner.filters import ScanCandidate, build_base_candidate, passes_liquidity
 from stockscanner.indicators import pct_return, rs_percentile
@@ -39,9 +39,7 @@ def run_scan(
     del config_path
 
     output_cfg = config.output
-    cache_dir = Path(output_cfg.get("cache_dir", "data/cache"))
-    if not cache_dir.is_absolute():
-        cache_dir = Path(__file__).resolve().parent.parent / cache_dir
+    cache_dir = resolve_cache_dir(config_path)
 
     symbols = get_universe(
         config.universe.get("source", "sp500"),
