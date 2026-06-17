@@ -52,6 +52,27 @@ function ratingClass(rating) {
   return "";
 }
 
+const RATING_ORDER = {
+  "STRONG HOLD": 0,
+  HOLD: 1,
+  WATCH: 2,
+  TRIM: 3,
+  EXIT: 4,
+  "—": 5,
+};
+
+function sortHoldings(holdings) {
+  return [...holdings].sort((a, b) => {
+    const ra = RATING_ORDER[a.rating] ?? 9;
+    const rb = RATING_ORDER[b.rating] ?? 9;
+    if (ra !== rb) return ra - rb;
+    const ca = Number(a.confidence) || 0;
+    const cb = Number(b.confidence) || 0;
+    if (cb !== ca) return cb - ca;
+    return String(a.symbol).localeCompare(String(b.symbol));
+  });
+}
+
 function preparePlans(plans) {
   const rows = plans.map((p) => ({
     ...p,
@@ -153,7 +174,7 @@ function renderDashboard(payload) {
 
 function renderPortfolio(data) {
   const body = $("pf-body");
-  const holdings = data?.holdings || [];
+  const holdings = sortHoldings(data?.holdings || []);
   if (!holdings.length) {
     body.innerHTML = '<tr><td colspan="7" class="empty">No holdings rated.</td></tr>';
     return;

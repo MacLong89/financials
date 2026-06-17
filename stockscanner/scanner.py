@@ -36,8 +36,6 @@ def run_scan(
     skip_pead: bool = False,
     config_path: Path | None = None,
 ) -> ScanResult:
-    del config_path
-
     output_cfg = config.output
     cache_dir = resolve_cache_dir(config_path)
 

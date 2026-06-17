@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -132,11 +133,17 @@ def run_portfolio_review(
         require_above=bool(regime_cfg.get("require_above", True)),
     )
 
-    universe = get_universe(
-        cfg.universe.get("source", "sp500"),
-        cfg.universe.get("custom_symbols", []),
-    )
-    all_symbols = sorted(set(universe) | set(parsed))
+    if os.environ.get("VERCEL"):
+        # Full S&P 500 fetch exceeds Vercel serverless timeouts; rank vs holdings + benchmark.
+        all_symbols = sorted(set(parsed) | {benchmark})
+        vercel_mode = True
+    else:
+        universe = get_universe(
+            cfg.universe.get("source", "sp500"),
+            cfg.universe.get("custom_symbols", []),
+        )
+        all_symbols = sorted(set(universe) | set(parsed))
+        vercel_mode = False
     history = fetch_bulk_history(
         all_symbols,
         cache_dir=cache_dir,
@@ -261,7 +268,7 @@ def run_portfolio_review(
             )
         )
 
-    order = {"EXIT": 0, "TRIM": 1, "WATCH": 2, "HOLD": 3, "STRONG HOLD": 4, "—": 5}
+    order = {"STRONG HOLD": 0, "HOLD": 1, "WATCH": 2, "TRIM": 3, "EXIT": 4, "—": 5}
     reviews.sort(key=lambda r: (order.get(r.rating, 9), -r.confidence, r.symbol))
 
     summary = {"strong_hold": 0, "hold": 0, "watch": 0, "trim": 0, "exit": 0}
@@ -281,4 +288,5 @@ def run_portfolio_review(
         "holdings": [r.__dict__ for r in reviews],
         "summary": summary,
         "symbol_count": len(parsed),
+        "vercel_mode": vercel_mode,
     }
