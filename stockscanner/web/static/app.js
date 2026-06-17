@@ -162,7 +162,12 @@ function renderDashboard(payload) {
     : "—";
 
   $("last-scan").textContent = fmtTime(payload.ran_at);
-  $("scan-source").textContent = payload.source ? `via ${payload.source}` : "—";
+  if (payload.vercel_mode) {
+    const n = payload.stats?.universe_size ?? "—";
+    $("scan-source").textContent = `${payload.source || "manual"} · liquid S&P subset (${n} names)`;
+  } else {
+    $("scan-source").textContent = payload.source ? `via ${payload.source}` : "—";
+  }
   $("match-count").textContent = `${stats.match_count ?? "—"} / ${stats.plan_count ?? "—"}`;
 
   const stopPct = ((rules.stop_pct || 0) * 100).toFixed(1);

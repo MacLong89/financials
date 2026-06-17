@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,6 +29,7 @@ class ScanResult:
     screened_count: int
     sector_count: int
     min_signals_required: int
+    vercel_mode: bool = False
 
 
 def run_scan(
@@ -39,10 +41,12 @@ def run_scan(
     output_cfg = config.output
     cache_dir = resolve_cache_dir(config_path)
 
-    symbols = get_universe(
-        config.universe.get("source", "sp500"),
-        config.universe.get("custom_symbols", []),
-    )
+    vercel_mode = bool(os.environ.get("VERCEL"))
+    if vercel_mode:
+        source = config.universe.get("vercel_source", "sp500_liquid")
+    else:
+        source = config.universe.get("source", "sp500")
+    symbols = get_universe(source, config.universe.get("custom_symbols", []))
 
     regime_cfg = config.regime
     benchmark = regime_cfg.get("benchmark", "SPY")
@@ -191,4 +195,5 @@ def run_scan(
         screened_count=screened,
         sector_count=len(sector_rets),
         min_signals_required=min_pass,
+        vercel_mode=vercel_mode,
     )

@@ -2,6 +2,7 @@
 
 universe:
   source: sp500
+  vercel_source: sp500_liquid   # ~90 liquid S&P names on Vercel (full 500 times out)
   custom_symbols: []
 
 filters:

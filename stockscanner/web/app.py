@@ -121,15 +121,6 @@ def api_history_item(scan_id: str) -> dict:
 
 @app.post("/api/scan")
 def api_scan(body: ScanRequest | None = None) -> dict:
-    if os.environ.get("VERCEL"):
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Full S&P 500 swing scan is not available on Vercel (serverless timeout). "
-                "Use Portfolio → Rate Holdings, Intraday, or run locally: python -m stockscanner web"
-            ),
-        )
-
     if service.is_scanning():
         raise HTTPException(status_code=409, detail="Scan already in progress")
 
