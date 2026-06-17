@@ -110,7 +110,7 @@ def run_scan(
     strict = _rank_candidates(strict)
     strict_match_count = len(strict)
 
-    fallback_min = int(output_cfg.get("fallback_min_rows", 5))
+    fallback_min = int(output_cfg.get("fallback_min_rows", 10))
     candidates = list(strict)
     if len(candidates) < fallback_min:
         strict_symbols = {c.symbol for c in candidates}

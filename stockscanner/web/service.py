@@ -146,7 +146,7 @@ def _result_to_payload(
             "stop_pct": float(plan_cfg.get("stop_pct", 0.075)),
             "reward_risk": float(plan_cfg.get("reward_risk", 2.0)),
             "min_confidence": min_conf,
-            "fallback_min_rows": int(output_cfg.get("fallback_min_rows", 5)),
+            "fallback_min_rows": int(output_cfg.get("fallback_min_rows", 10)),
         },
         "plans": normalize_plans([_plan_to_dict(p) for p in display_plans]),
         "all_plans": normalize_plans([_plan_to_dict(p) for p in plans]),
