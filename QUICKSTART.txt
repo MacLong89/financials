@@ -1,0 +1,29 @@
+Stock Scanner - Quick Start
+===========================
+
+FIRST TIME (once):
+  Double-click "Setup Stock Scanner.bat" in this folder
+  OR run: Desktop\Stock Scanner\ (created after setup)
+
+  When prompted, paste your Discord webhook URL.
+
+DAILY / WEEKLY USE:
+  Desktop\Stock Scanner\Run Scan (with Discord alert).bat
+
+  You get a Discord ping only when NEW setups appear or regime changes.
+
+OTHER LAUNCHERS (on Desktop after setup):
+  - Check Market Regime.bat     -> SPY above/below 200 MA?
+  - Test Discord Alert.bat      -> verify webhook works
+  - Run Scan (no alert).bat     -> scan only, no Discord
+
+RESULTS:
+  CSV exports: stockscanner\data\exports\scan_YYYYMMDD.csv
+
+DISCORD WEBHOOK (if you skipped setup):
+  1. Discord server -> Settings -> Integrations -> Webhooks -> New
+  2. Copy URL into stockscanner\.env as DISCORD_WEBHOOK_URL=
+  3. Run "Test Discord Alert.bat"
+
+SCHEDULED SCAN (optional):
+  Setup script can install Mon-Fri 4:30 PM auto-scan.

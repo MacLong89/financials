@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+data/cache/
+data/exports/
+data/alerts/
+data/scans/
+data/portfolio.json
+data/user/*
+!data/user/.gitkeep
+data/logs/
+.pytest_cache/
+*.egg-info/

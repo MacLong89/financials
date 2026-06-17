@@ -1,0 +1,3 @@
+# Keep user data on disk but out of git
+*
+!.gitignore

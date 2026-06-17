@@ -1,0 +1,120 @@
+# Momentum swing scanner — empirical signals + optional chart setups
+
+universe:
+  source: sp500
+  custom_symbols: []
+
+filters:
+  min_price: 10.0
+  min_avg_volume: 500_000
+  min_history_days: 200
+
+regime:
+  benchmark: SPY
+  ma_period: 200
+  require_above: true
+
+signals:
+  min_pass_count: 4          # was 3 — require 4/6 signals
+  jt_momentum:
+    enabled: true
+    lookback_days: 126
+    top_pct: 0.16            # was 0.20 — top 16%
+  gh_52w_high:
+    enabled: true
+    min_ratio: 0.92          # was 0.90
+    top_pct: 0.16            # was 0.20
+    use_top_pct: true
+  industry_momentum:
+    enabled: true
+    sector_lookback_days: 63
+    top_sector_pct: 0.24     # was 0.30
+    top_stock_in_sector_pct: 0.24
+  pead:
+    enabled: true
+    lookback_days: 20
+    min_gap_pct: 0.024       # was 0.02
+    require_hold_gap: true
+    require_eps_beat: true
+  momentum_6_1:
+    enabled: true
+    total_lookback_days: 126
+    skip_days: 21
+    top_pct: 0.16            # was 0.20
+  trend:
+    enabled: true
+    stock_ma_period: 200
+    require_stock_above_ma: true
+    require_market_risk_on: true
+
+setups:
+  require_breakout_or_pullback: false
+
+breakout:
+  base_min_days: 10
+  base_max_days: 20
+  base_max_range_pct: 0.08
+  volume_multiplier: 1.5
+
+pullback:
+  ema_period: 20
+  touch_tolerance_pct: 0.02
+  require_green_candle: true
+  volume_multiplier: 1.0
+
+scoring:
+  weight_signal_count: 0.50
+  weight_rs: 0.20
+  weight_52w_ratio: 0.15
+  weight_setup: 0.15
+
+output:
+  top_n: 50
+  plan_max_rows: 15       # rows shown in terminal plan table
+  cache_dir: data/cache
+  cache_max_age_hours: 4
+
+plan:
+  stop_pct: 0.075
+  reward_risk: 2.0
+  min_confidence: 72       # filters weak plans after graded confidence
+
+alerts:
+  mode: new
+  on_risk_off: true
+  persist_state: true
+  state_file: data/alerts/last_state.json
+  discord:
+    enabled: true
+  email:
+    enabled: false
+
+web:
+  host: 127.0.0.1
+  port: 8787
+  auto_schedule: true
+  schedule_hour: 7
+  schedule_minute: 30
+  timezone: America/Denver
+  schedule_fast: true
+  schedule_alert: true
+
+intraday:
+  symbols:
+    - SPY
+    - QQQ
+  interval: 5m
+  orb_bars: 6              # 30 min opening range on 5m bars
+  volume_multiplier: 1.2
+  stop_pct: 0.003          # 0.3% tight stop for index day trades
+  reward_risk: 2.0
+  min_orb_break_pct: 0.0005
+  min_trade_confidence: 65   # ORB/VWAP only; TREND/FLAT never tradeable
+
+portfolio:
+  strong_hold_min_signals: 4
+  strong_hold_min_confidence: 72
+  hold_min_signals: 3
+  hold_min_confidence: 55
+  trim_max_signals: 2
+  exit_max_signals: 1
