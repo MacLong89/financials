@@ -85,8 +85,10 @@ def api_status() -> dict:
     return {
         "scanning": service.is_scanning(),
         "intraday_scanning": service.is_intraday_scanning(),
+        "reversal_scanning": service.is_reversal_scanning(),
         "latest": latest,
         "intraday": intraday,
+        "reversal": store.load_reversal(),
         "portfolio": portfolio,
         "session": session,
         "schedule": {
@@ -158,6 +160,30 @@ def api_intraday_scan() -> dict:
         raise
     except Exception as exc:
         logger.exception("Intraday scan failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/api/reversal")
+def api_reversal() -> dict:
+    data = store.load_reversal()
+    if data is None:
+        return {"setups": [], "message": "No reversal scan yet. Click Scan Reversals."}
+    return data
+
+
+@app.post("/api/reversal/scan")
+def api_reversal_scan() -> dict:
+    if service.is_reversal_scanning():
+        raise HTTPException(status_code=409, detail="Reversal scan already in progress")
+    try:
+        result = service.run_reversal_and_store(_config)
+        if result.get("status") == "busy":
+            raise HTTPException(status_code=409, detail="Reversal scan already in progress")
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Reversal scan failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

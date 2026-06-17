@@ -24,6 +24,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="swing" role="tab" aria-selected="true">Swing</button>
       <button class="tab" data-tab="intraday" role="tab" aria-selected="false">Intraday</button>
+      <button class="tab" data-tab="reversal" role="tab" aria-selected="false">Reversal</button>
       <button class="tab" data-tab="portfolio" role="tab" aria-selected="false">Portfolio</button>
     </nav>
 
@@ -63,15 +64,17 @@
               <tr>
                 <th>#</th>
                 <th>Stock</th>
-                <th>Scanner Summary</th>
-                <th>Conf</th>
+                <th>Signals</th>
+                <th>Mom</th>
+                <th>Cfm</th>
+                <th>Total</th>
                 <th>Entry</th>
                 <th>Target</th>
                 <th>Stop</th>
               </tr>
             </thead>
             <tbody id="plans-body">
-              <tr><td colspan="7" class="empty">No data yet. Click Run Scan Now.</td></tr>
+              <tr><td colspan="9" class="empty">No data yet. Click Run Scan Now.</td></tr>
             </tbody>
           </table>
         </div>
@@ -147,6 +150,52 @@
       </section>
     </div>
 
+    <!-- Reversal tab -->
+    <div id="tab-reversal" class="tab-panel">
+      <section class="cards">
+        <div class="card">
+          <span class="label">Universe</span>
+          <span class="value sm">S&amp;P 500</span>
+          <span class="meta">Oversold bounces · RISK-ON only</span>
+        </div>
+        <div class="card">
+          <span class="label">Last Scan</span>
+          <span class="value sm" id="rev-last-scan">Never</span>
+          <span class="meta" id="rev-count">— setups</span>
+        </div>
+        <div class="card disclaimer-card">
+          <span class="label">Counter-trend</span>
+          <span class="value sm">2–5 day holds</span>
+          <span class="meta">RSI &lt; 30 · above 200 MA · optional BB reclaim</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Oversold Setups</h2>
+          <span id="rev-scan-status" class="status-pill idle">Ready</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Symbol</th>
+                <th>Setup</th>
+                <th>RSI</th>
+                <th>Summary</th>
+                <th>Conf</th>
+                <th>Price</th>
+              </tr>
+            </thead>
+            <tbody id="rev-body">
+              <tr><td colspan="7" class="empty">No data yet. Click Scan Reversals.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
     <!-- Portfolio tab -->
     <div id="tab-portfolio" class="tab-panel">
       <section class="cards">
@@ -168,7 +217,7 @@
         <div class="card">
           <span class="label">Last Review</span>
           <span class="value sm" id="pf-last-review">Never</span>
-          <span class="meta">Same 6-signal framework</span>
+          <span class="meta">Core 4/6 + confirmers + quality</span>
         </div>
       </section>
 
@@ -197,33 +246,35 @@
               <tr>
                 <th>Symbol</th>
                 <th>Rating</th>
-                <th>Signals</th>
-                <th>Conf</th>
+                <th>Core</th>
+                <th>Cfm</th>
+                <th>Mom</th>
+                <th>Qual</th>
+                <th>Total</th>
                 <th>Price</th>
                 <th>200 MA</th>
                 <th>Why</th>
               </tr>
             </thead>
             <tbody id="pf-body">
-              <tr><td colspan="7" class="empty">Enter tickers above and click Rate Holdings.</td></tr>
+              <tr><td colspan="10" class="empty">Enter tickers above and click Rate Holdings.</td></tr>
             </tbody>
           </table>
         </div>
         <div class="panel-foot">
-          <p><strong>STRONG HOLD</strong> — 4+/6 signals, ≥72% conf, above 200 MA ·
-             <strong>HOLD</strong> — 3+/6, ≥55% conf, above 200 MA ·
-             <strong>WATCH</strong> — mixed ·
-             <strong>TRIM</strong> — weak momentum or below 200 MA ·
-             <strong>EXIT</strong> — 0–1 signals or broken trend</p>
+          <p><strong>STRONG HOLD</strong> — 4+/6 core, high combined score, above 200 MA ·
+             <strong>HOLD</strong> — 3+/6 core ·
+             <strong>WATCH</strong> — mixed or weak quality overlay ·
+             <strong>TRIM/EXIT</strong> — weak momentum or below 200 MA</p>
         </div>
       </section>
     </div>
 
     <footer class="footer">
-      <span id="footer-signals">JT · GH · IM · PE · 6-1 · TR</span>
+      <span id="footer-signals">Core: JT·GH·IM·PE·6-1·TR · Confirmers: RS·VOL·SQZ·MA</span>
       <span>Research tool only — not financial advice</span>
     </footer>
   </div>
-  <script src="/static/app.js?v=6"></script>
+  <script src="/static/app.js?v=7"></script>
 </body>
 </html>

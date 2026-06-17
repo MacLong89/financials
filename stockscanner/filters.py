@@ -6,6 +6,7 @@ import pandas as pd
 
 from stockscanner.indicators import avg_volume, high_52w_distance_pct, ratio_52w_high
 from stockscanner.signals.empirical import EmpiricalSignals
+from stockscanner.signals.confirmers import ConfirmerSignals
 
 
 @dataclass
@@ -19,6 +20,7 @@ class ScanCandidate:
     avg_volume_20d: float
     above_200ma: bool
     signals: EmpiricalSignals = field(default_factory=EmpiricalSignals)
+    confirmers: ConfirmerSignals = field(default_factory=ConfirmerSignals)
     setup_breakout: bool = False
     setup_pullback: bool = False
     score: float = 0.0
@@ -28,6 +30,10 @@ class ScanCandidate:
     @property
     def signal_count(self) -> int:
         return self.signals.pass_count
+
+    @property
+    def confirmer_count(self) -> int:
+        return self.confirmers.pass_count
 
 
 def passes_liquidity(

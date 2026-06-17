@@ -142,7 +142,7 @@ body {
   border: 1px solid var(--border);
 }
 
-.rating-strong { color: var(--green); font-weight: 700; }
+.summary-cell { font-size: 0.85rem; max-width: 220px; }
 .rating-hold { color: #86efac; font-weight: 600; }
 .rating-watch { color: var(--amber); font-weight: 600; }
 .rating-trim { color: #fb923c; font-weight: 600; }

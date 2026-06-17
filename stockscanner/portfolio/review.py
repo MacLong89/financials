@@ -7,7 +7,11 @@ from typing import Any
 
 from stockscanner.config import ScannerConfig, resolve_cache_dir
 from stockscanner.data import fetch_benchmark, fetch_bulk_history, fetch_history
-from stockscanner.eval_context import build_evaluated_candidate, build_evaluation_context
+from stockscanner.eval_context import (
+    build_evaluated_candidate,
+    build_evaluation_context,
+    fetch_candidate_quality,
+)
 from stockscanner.plan import build_trade_plan
 from stockscanner.regime import RegimeStatus, evaluate_regime
 from stockscanner.universe import get_universe
@@ -25,6 +29,9 @@ class HoldingReview:
     rs_percentile: float
     ratio_52w: float
     reason: str
+    scores: dict | None = None
+    confirmers: str = "-"
+    quality_label: str | None = None
     error: str | None = None
 
 
@@ -84,6 +91,21 @@ def _rate_holding(
     return rating, reason
 
 
+def _apply_quality_downgrade(
+    rating: str,
+    reason: str,
+    *,
+    quality_score: float | None,
+    cfg: dict,
+) -> tuple[str, str]:
+    if quality_score is None:
+        return rating, reason
+    floor = float(cfg.get("downgrade_below", 40))
+    if quality_score < floor and rating in {"STRONG HOLD", "HOLD"}:
+        return "WATCH", f"Weak fundamentals ({quality_score:.0f}% qual). {reason}"
+    return rating, reason
+
+
 def run_portfolio_review(
     symbols: list[str],
     config: ScannerConfig | None = None,
@@ -92,6 +114,7 @@ def run_portfolio_review(
 ) -> dict[str, Any]:
     cfg = config or ScannerConfig.load()
     pf_cfg = cfg.section("portfolio")
+    qual_cfg = cfg.section("quality")
     output_cfg = cfg.output
     cache_dir = resolve_cache_dir()
 
@@ -143,7 +166,6 @@ def run_portfolio_review(
             if df is not None and len(df) >= 50:
                 history[sym] = df
 
-    signals_cfg = cfg.signals
     eval_ctx = build_evaluation_context(history, cfg, cache_dir)
     reviews: list[HoldingReview] = []
 
@@ -167,6 +189,7 @@ def run_portfolio_review(
             )
             continue
 
+        quality = fetch_candidate_quality(sym, cfg, cache_dir)
         candidate = build_evaluated_candidate(
             sym,
             df,
@@ -174,6 +197,7 @@ def run_portfolio_review(
             regime=regime,
             config=cfg,
             skip_pead=skip_pead,
+            quality=quality,
         )
         if candidate is None:
             reviews.append(
@@ -194,19 +218,27 @@ def run_portfolio_review(
             continue
 
         plan = build_trade_plan(candidate)
+        scores = candidate.detail.get("scores") if isinstance(candidate.detail.get("scores"), dict) else {}
+        combined_conf = float(scores.get("combined_score", plan.confidence_exact))
 
         rating, reason = _rate_holding(
             signal_count=candidate.signal_count,
-            confidence=plan.confidence_exact,
+            confidence=combined_conf,
             above_200ma=candidate.above_200ma,
             regime=regime,
             cfg=pf_cfg,
+        )
+        rating, reason = _apply_quality_downgrade(
+            rating,
+            reason,
+            quality_score=scores.get("quality_score"),
+            cfg=qual_cfg,
         )
         reviews.append(
             HoldingReview(
                 symbol=sym,
                 rating=rating,
-                confidence=plan.confidence_exact,
+                confidence=combined_conf,
                 signal_count=candidate.signal_count,
                 signals=candidate.signals.codes,
                 price=candidate.last_close,
@@ -214,6 +246,9 @@ def run_portfolio_review(
                 rs_percentile=candidate.rs_percentile,
                 ratio_52w=candidate.ratio_52w,
                 reason=reason,
+                scores=scores,
+                confirmers=candidate.confirmers.codes,
+                quality_label=quality.label if quality else None,
             )
         )
 

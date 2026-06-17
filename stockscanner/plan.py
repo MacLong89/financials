@@ -16,6 +16,7 @@ class TradePlan:
     stop: float
     chart: str
     rs_percentile: float = 0.0
+    scores: dict | None = None
 
     @property
     def confidence(self) -> int:
@@ -39,14 +40,18 @@ def _chart_label(candidate: ScanCandidate) -> str:
 
 def _summary(candidate: ScanCandidate) -> str:
     sig = candidate.signals.codes
+    cfm = candidate.confirmers.codes
     chart = _chart_label(candidate)
-    base = f"{candidate.signal_count}/6 {sig}"
+    base = f"{candidate.signal_count}/6 {sig} · {candidate.confirmer_count}/4 {cfm}"
     if chart != "-":
         return f"{base} | {chart}"
     return base
 
 
 def _confidence_exact(candidate: ScanCandidate) -> float:
+    scores = candidate.detail.get("scores")
+    if isinstance(scores, dict) and "total_score" in scores:
+        return float(scores["total_score"])
     sig_pts = (candidate.signal_count / 6.0) * 35.0
     rs_pts = candidate.rs_percentile * 25.0
     gh_pts = candidate.ratio_52w * 15.0
@@ -68,6 +73,7 @@ def build_trade_plan(
     entry = candidate.last_close
     stop = round(entry * (1.0 - stop_pct), 2)
     target = round(entry * (1.0 + stop_pct * reward_risk), 2)
+    scores = candidate.detail.get("scores")
     return TradePlan(
         priority=priority,
         symbol=candidate.symbol,
@@ -78,6 +84,7 @@ def build_trade_plan(
         stop=stop,
         chart=_chart_label(candidate),
         rs_percentile=candidate.rs_percentile,
+        scores=dict(scores) if isinstance(scores, dict) else None,
     )
 
 

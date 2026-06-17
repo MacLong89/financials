@@ -111,6 +111,44 @@ intraday:
   min_orb_break_pct: 0.0005
   min_trade_confidence: 65   # ORB/VWAP only; TREND/FLAT never tradeable
 
+confirmers:
+  rs_spy:
+    enabled: true
+    lookback_days: 63
+    top_pct: 0.20
+  vol_c:
+    enabled: true
+    volume_multiplier: 1.2
+    range_top_pct: 0.30
+  sqz:
+    enabled: true
+    atr_ratio_max: 0.75
+  ma_s:
+    enabled: true
+    fast_ma: 50
+    slow_ma: 200
+    slope_lookback: 20
+
+score_families:
+  momentum_weight: 0.40
+  event_trend_weight: 0.25
+  confirmation_weight: 0.20
+  chart_weight: 0.15
+  quality_weight: 0.10
+
+quality:
+  enabled: true
+  cache_max_age_hours: 24
+  downgrade_below: 40
+
+reversal:
+  rsi_period: 14
+  rsi_max: 30
+  require_above_200ma: true
+  require_risk_on: true
+  min_confidence: 50
+  max_rows: 20
+
 portfolio:
   strong_hold_min_signals: 4
   strong_hold_min_confidence: 72

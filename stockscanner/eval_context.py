@@ -9,6 +9,7 @@ from stockscanner.config import ScannerConfig
 from stockscanner.filters import ScanCandidate, build_base_candidate, passes_liquidity
 from stockscanner.indicators import pct_return, rs_percentile
 from stockscanner.regime import RegimeStatus
+from stockscanner.score_breakdown import ScoreBreakdown, compute_score_breakdown
 from stockscanner.scoring import apply_tags, score_candidate
 from stockscanner.sectors import (
     build_sector_map,
@@ -16,8 +17,14 @@ from stockscanner.sectors import (
     sector_percentile_ranks,
 )
 from stockscanner.signals.breakout import detect_breakout
+from stockscanner.signals.confirmers import (
+    ConfirmerContext,
+    build_confirmer_context,
+    evaluate_confirmers,
+)
 from stockscanner.signals.empirical import SignalContext, build_signal_context, evaluate_empirical_signals
 from stockscanner.signals.pullback import detect_pullback
+from stockscanner.signals.quality import QualityMetrics, evaluate_quality
 
 
 @dataclass(frozen=True)
@@ -25,8 +32,10 @@ class EvaluationContext:
     liquidity_symbols: list[str]
     sector_map: dict[str, str]
     signal_ctx: SignalContext
+    confirmer_ctx: ConfirmerContext
     jt_pct_map: dict[str, float]
     sector_rank: dict[str, float]
+    benchmark: str
 
 
 def build_evaluation_context(
@@ -36,6 +45,7 @@ def build_evaluation_context(
 ) -> EvaluationContext:
     filters = config.filters
     signals_cfg = config.signals
+    benchmark = config.regime.get("benchmark", "SPY")
 
     liquidity_symbols = [
         sym
@@ -53,6 +63,12 @@ def build_evaluation_context(
     sector_rets = sector_momentum_returns(history, sector_map, im_lb)
     sector_rank = sector_percentile_ranks(sector_rets)
     signal_ctx = build_signal_context(history, sector_map, sector_rank, signals_cfg)
+    confirmer_ctx = build_confirmer_context(
+        history,
+        liquidity_symbols,
+        benchmark,
+        config.section("confirmers"),
+    )
 
     jt_lb = int(signals_cfg.get("jt_momentum", {}).get("lookback_days", 126))
     jt_returns = {
@@ -67,8 +83,10 @@ def build_evaluation_context(
         liquidity_symbols=liquidity_symbols,
         sector_map=sector_map,
         signal_ctx=signal_ctx,
+        confirmer_ctx=confirmer_ctx,
         jt_pct_map=jt_pct_map,
         sector_rank=sector_rank,
+        benchmark=benchmark,
     )
 
 
@@ -80,11 +98,13 @@ def build_evaluated_candidate(
     regime: RegimeStatus,
     config: ScannerConfig,
     skip_pead: bool,
+    quality: QualityMetrics | None = None,
 ) -> ScanCandidate | None:
     signals_cfg = config.signals
     scoring_cfg = config.scoring
     breakout_cfg = config.breakout
     pullback_cfg = config.pullback
+    confirmers_cfg = config.section("confirmers")
 
     empirical = evaluate_empirical_signals(
         symbol,
@@ -115,6 +135,12 @@ def build_evaluated_candidate(
     )
 
     candidate.signals = empirical
+    candidate.confirmers = evaluate_confirmers(
+        symbol,
+        df,
+        ctx=eval_ctx.confirmer_ctx,
+        config=confirmers_cfg,
+    )
     candidate.setup_breakout = bo.triggered
     candidate.setup_pullback = pb.triggered
     candidate.detail["sector"] = eval_ctx.sector_map.get(symbol)
@@ -131,4 +157,27 @@ def build_evaluated_candidate(
         weight_setup=float(scoring_cfg.get("weight_setup", 0.15)),
     )
     apply_tags(candidate)
+
+    breakdown = compute_score_breakdown(
+        candidate,
+        config.raw,
+        quality=quality,
+    )
+    candidate.detail["scores"] = breakdown.to_dict()
     return candidate
+
+
+def fetch_candidate_quality(
+    symbol: str,
+    config: ScannerConfig,
+    cache_dir: Path,
+) -> QualityMetrics | None:
+    qual_cfg = config.section("quality")
+    if not qual_cfg.get("enabled", True):
+        return None
+    return evaluate_quality(
+        symbol,
+        cache_dir=cache_dir,
+        max_age_hours=float(qual_cfg.get("cache_max_age_hours", 24)),
+        config=qual_cfg,
+    )

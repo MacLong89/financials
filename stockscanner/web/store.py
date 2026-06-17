@@ -12,6 +12,7 @@ from stockscanner.config import data_dir
 SCANS_DIR = data_dir() / "scans"
 LATEST_FILE = SCANS_DIR / "latest.json"
 INTRADAY_LATEST = SCANS_DIR / "intraday_latest.json"
+REVERSAL_LATEST = SCANS_DIR / "reversal_latest.json"
 USER_DIR = data_dir() / "user"
 PORTFOLIO_FILE = USER_DIR / "portfolio.json"
 PORTFOLIO_REVIEW_FILE = USER_DIR / "portfolio_review.json"
@@ -54,6 +55,18 @@ def save_intraday(payload: dict[str, Any]) -> Path:
     _ensure_dir()
     INTRADAY_LATEST.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return INTRADAY_LATEST
+
+
+def save_reversal(payload: dict[str, Any]) -> Path:
+    _ensure_dir()
+    REVERSAL_LATEST.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return REVERSAL_LATEST
+
+
+def load_reversal() -> dict[str, Any] | None:
+    if not REVERSAL_LATEST.exists():
+        return None
+    return json.loads(REVERSAL_LATEST.read_text(encoding="utf-8"))
 
 
 def load_intraday() -> dict[str, Any] | None:

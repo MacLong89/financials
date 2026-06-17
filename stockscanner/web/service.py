@@ -7,15 +7,20 @@ from typing import Any
 from stockscanner.config import ScannerConfig
 from stockscanner.web.store import (
     load_intraday,
+    load_reversal,
     normalize_plans,
     save_intraday,
     save_portfolio,
     save_portfolio_review,
+    save_reversal,
     save_scan,
 )
 
 _intraday_lock = threading.Lock()
 _intraday_scanning = False
+
+_reversal_lock = threading.Lock()
+_reversal_scanning = False
 
 
 def run_intraday_and_store(config: ScannerConfig | None = None) -> dict[str, Any]:
@@ -40,12 +45,34 @@ def is_intraday_scanning() -> bool:
     return _intraday_scanning
 
 
+def run_reversal_and_store(config: ScannerConfig | None = None) -> dict[str, Any]:
+    from stockscanner.reversal.scanner import run_reversal_scan
+
+    global _reversal_scanning
+    with _reversal_lock:
+        if _reversal_scanning:
+            return {"status": "busy"}
+        _reversal_scanning = True
+    try:
+        payload = run_reversal_scan(config)
+        payload["status"] = "ok"
+        save_reversal(payload)
+        return payload
+    finally:
+        with _reversal_lock:
+            _reversal_scanning = False
+
+
+def is_reversal_scanning() -> bool:
+    return _reversal_scanning
+
+
 _scan_lock = threading.Lock()
 _scanning = False
 
 
 def _plan_to_dict(p) -> dict[str, Any]:
-    return {
+    row = {
         "priority": p.priority,
         "stock": p.symbol,
         "summary": p.summary,
@@ -56,6 +83,9 @@ def _plan_to_dict(p) -> dict[str, Any]:
         "stop": p.stop,
         "chart": p.chart,
     }
+    if p.scores:
+        row["scores"] = p.scores
+    return row
 
 
 def _result_to_payload(

@@ -73,8 +73,18 @@ function fmtConf(p) {
   return Number(v).toFixed(1) + "%";
 }
 
+function scoreCell(scores, key) {
+  if (!scores || scores[key] == null) return "—";
+  return Number(scores[key]).toFixed(0);
+}
+
 function setStatus(text, cls, tab = "swing") {
-  const ids = { swing: "scan-status", intraday: "id-scan-status", portfolio: "pf-status" };
+  const ids = {
+    swing: "scan-status",
+    intraday: "id-scan-status",
+    portfolio: "pf-status",
+    reversal: "rev-scan-status",
+  };
   const el = $(ids[tab] || "scan-status");
   if (!el) return;
   el.textContent = text;
@@ -124,20 +134,26 @@ function renderPlans(data) {
   const body = $("plans-body");
   const plans = preparePlans(data?.plans || []);
   if (!plans.length) {
-    body.innerHTML = '<tr><td colspan="7" class="empty">No trade plans match filters today.</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="empty">No trade plans match filters today.</td></tr>';
     return;
   }
-  body.innerHTML = plans.map((p) => `
+  body.innerHTML = plans.map((p) => {
+    const s = p.scores || {};
+    const total = s.total_score ?? p.confidence_exact ?? p.confidence;
+    return `
     <tr>
       <td class="priority">${p.priority}</td>
       <td><strong>${p.stock}</strong></td>
-      <td>${p.summary}</td>
-      <td class="${confClass(p.confidence_exact ?? p.confidence)}">${fmtConf(p)}</td>
+      <td class="summary-cell">${p.summary}</td>
+      <td>${scoreCell(s, "momentum_score")}</td>
+      <td>${scoreCell(s, "confirmation_score")}</td>
+      <td class="${confClass(total)}">${Number(total).toFixed(1)}%</td>
       <td>${fmtMoney(p.entry)}</td>
       <td>${fmtMoney(p.target)}</td>
       <td>${fmtMoney(p.stop)}</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function renderIntraday(data) {
@@ -178,6 +194,30 @@ function renderIntraday(data) {
   }
 }
 
+function renderReversal(data) {
+  const body = $("rev-body");
+  const setups = data?.setups || [];
+  if (!setups.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty">No oversold setups found.</td></tr>';
+    $("rev-last-scan").textContent = fmtTime(data?.ran_at);
+    $("rev-count").textContent = "0 setups";
+    return;
+  }
+  body.innerHTML = setups.map((s, i) => `
+    <tr>
+      <td class="priority">${i + 1}</td>
+      <td><strong>${s.symbol}</strong></td>
+      <td class="${setupClass(s.setup)}">${s.setup}</td>
+      <td>${Number(s.rsi).toFixed(0)}</td>
+      <td>${s.summary}</td>
+      <td class="${confClass(s.confidence)}">${Number(s.confidence).toFixed(1)}%</td>
+      <td>${fmtMoney(s.price)}</td>
+    </tr>
+  `).join("");
+  $("rev-last-scan").textContent = fmtTime(data.ran_at);
+  $("rev-count").textContent = `${setups.length} setups`;
+}
+
 function renderDashboard(payload) {
   if (!payload) return;
 
@@ -214,21 +254,28 @@ function renderPortfolio(data) {
   const body = $("pf-body");
   const holdings = sortHoldings(data?.holdings || []);
   if (!holdings.length) {
-    body.innerHTML = '<tr><td colspan="7" class="empty">No holdings rated.</td></tr>';
+    body.innerHTML = '<tr><td colspan="10" class="empty">No holdings rated.</td></tr>';
     return;
   }
 
-  body.innerHTML = holdings.map((h) => `
+  body.innerHTML = holdings.map((h) => {
+    const s = h.scores || {};
+    const total = s.combined_score ?? h.confidence;
+    return `
     <tr>
       <td><strong>${h.symbol}</strong></td>
       <td class="${ratingClass(h.rating)}">${h.rating}</td>
       <td>${h.signal_count}/6 ${h.signals}</td>
-      <td class="${confClass(h.confidence)}">${Number(h.confidence).toFixed(1)}%</td>
+      <td>${h.confirmers || "—"}</td>
+      <td>${scoreCell(s, "momentum_score")}</td>
+      <td>${scoreCell(s, "quality_score")}</td>
+      <td class="${confClass(total)}">${Number(total).toFixed(1)}%</td>
       <td>${fmtMoney(h.price)}</td>
       <td class="${h.above_200ma ? "ma-yes" : "ma-no"}">${h.above_200ma ? "Above" : "Below"}</td>
-      <td>${h.reason}</td>
+      <td>${h.reason}${h.quality_label ? ` · ${h.quality_label}` : ""}</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 
   const summary = data.summary || {};
   $("pf-ok-count").textContent = `${summary.strong_hold || 0} / ${summary.hold || 0}`;
@@ -411,21 +458,25 @@ function switchTab(tab, persist = true) {
   });
   $("tab-swing").classList.toggle("active", tab === "swing");
   $("tab-intraday").classList.toggle("active", tab === "intraday");
+  $("tab-reversal").classList.toggle("active", tab === "reversal");
   $("tab-portfolio").classList.toggle("active", tab === "portfolio");
 
   const subtitles = {
     swing: "Empirical swing trade plans",
     intraday: "SPY / QQQ intraday — play money only",
+    reversal: "Oversold mean-reversion bounces (RISK-ON)",
     portfolio: "Hold / trim / exit ratings for your positions",
   };
   const btnLabels = {
     swing: "Run Scan Now",
     intraday: "Refresh Intraday",
+    reversal: "Scan Reversals",
     portfolio: "Rate Holdings",
   };
   const footers = {
-    swing: "JT · GH · IM · PE · 6-1 · TR",
+    swing: "Core: JT·GH·IM·PE·6-1·TR · Confirmers: RS·VOL·SQZ·MA",
     intraday: "ORB · VWAP reclaim · Trend watch · 0.3% stop · 2:1 R:R",
+    reversal: "RSI < 30 · above 200 MA · BB reclaim bonus",
     portfolio: "STRONG HOLD · HOLD · WATCH · TRIM · EXIT",
   };
 
@@ -465,6 +516,15 @@ async function loadStatus() {
 
   if (data.latest) renderDashboard(data.latest);
   if (data.intraday) renderIntraday(data.intraday);
+  if (data.reversal) renderReversal(data.reversal);
+
+  if (data.reversal_scanning) {
+    setStatus("Scanning…", "running", "reversal");
+    if (activeTab === "reversal") $("btn-scan").disabled = true;
+  } else if (!data.scanning && !data.intraday_scanning) {
+    setStatus("Ready", "idle", "reversal");
+    if (activeTab === "reversal") $("btn-scan").disabled = false;
+  }
 
   const localSession = readSessionLocal();
   if (data.session) {
@@ -566,8 +626,34 @@ async function runIntradayScan() {
   }
 }
 
+async function runReversalScan() {
+  setStatus("Scanning…", "running", "reversal");
+  $("btn-scan").disabled = true;
+  try {
+    const res = await fetch("/api/reversal/scan", { method: "POST" });
+    if (res.status === 409) {
+      setStatus("Busy", "running", "reversal");
+      return;
+    }
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Reversal scan failed");
+    }
+    const data = await res.json();
+    renderReversal(data);
+    setStatus("Done", "done", "reversal");
+  } catch (e) {
+    setStatus("Error", "idle", "reversal");
+    alert(e.message);
+  } finally {
+    $("btn-scan").disabled = false;
+    setTimeout(() => setStatus("Ready", "idle", "reversal"), 3000);
+  }
+}
+
 function runScan() {
   if (activeTab === "intraday") runIntradayScan();
+  else if (activeTab === "reversal") runReversalScan();
   else if (activeTab === "portfolio") runPortfolioReview();
   else runSwingScan();
 }
