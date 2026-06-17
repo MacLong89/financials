@@ -4,5 +4,13 @@ version = "1.0.0"
 description = "Empirical swing scanner with portfolio hold ratings"
 requires-python = ">=3.11"
 
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["stockscanner*"]
+
 [tool.vercel]
-entrypoint = "stockscanner.web.app:app"
+entrypoint = "app:app"
