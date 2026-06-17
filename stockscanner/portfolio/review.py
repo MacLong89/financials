@@ -134,8 +134,12 @@ def run_portfolio_review(
     )
 
     if os.environ.get("VERCEL"):
-        # Full S&P 500 fetch exceeds Vercel serverless timeouts; rank vs holdings + benchmark.
-        all_symbols = sorted(set(parsed) | {benchmark})
+        # Full S&P 500 exceeds serverless timeouts; use liquid subset for peer ranks.
+        liquid = get_universe(
+            cfg.universe.get("vercel_source", "sp500_liquid"),
+            cfg.universe.get("custom_symbols", []),
+        )
+        all_symbols = sorted(set(parsed) | set(liquid) | {benchmark})
         vercel_mode = True
     else:
         universe = get_universe(
