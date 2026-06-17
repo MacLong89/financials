@@ -12,5 +12,8 @@ build-backend = "setuptools.build_meta"
 where = ["."]
 include = ["stockscanner*"]
 
+[tool.setuptools.package-data]
+"stockscanner.web" = ["static/*"]
+
 [tool.vercel]
 entrypoint = "app:app"

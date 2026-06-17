@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pickle
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -8,7 +9,17 @@ import yfinance as yf
 
 
 def _cache_path(cache_dir: Path, symbol: str) -> Path:
-    return cache_dir / f"{symbol.upper()}.parquet"
+    return cache_dir / f"{symbol.upper()}.pkl"
+
+
+def _read_cache(path: Path) -> pd.DataFrame:
+    with path.open("rb") as f:
+        return pickle.load(f)
+
+
+def _write_cache(path: Path, df: pd.DataFrame) -> None:
+    with path.open("wb") as f:
+        pickle.dump(df, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def _is_fresh(path: Path, max_age_hours: float) -> bool:
@@ -29,7 +40,7 @@ def fetch_history(
     path = _cache_path(cache_dir, symbol)
 
     if _is_fresh(path, max_age_hours):
-        df = pd.read_parquet(path)
+        df = _read_cache(path)
         if not df.empty:
             return df
 
@@ -40,7 +51,7 @@ def fetch_history(
 
     df = df.rename(columns=str.title)
     df.index = pd.to_datetime(df.index).tz_localize(None)
-    df.to_parquet(path)
+    _write_cache(path, df)
     return df
 
 

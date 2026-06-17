@@ -4,10 +4,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Any
 
-from stockscanner.alerts.dispatcher import configured_channels, dispatch_alerts
 from stockscanner.config import ScannerConfig
-from stockscanner.plan import build_trade_plans
-from stockscanner.scanner import run_scan
 from stockscanner.web.store import (
     load_intraday,
     normalize_plans,
@@ -16,14 +13,14 @@ from stockscanner.web.store import (
     save_portfolio_review,
     save_scan,
 )
-from stockscanner.intraday.scanner import run_intraday_scan
-from stockscanner.portfolio.review import run_portfolio_review
 
 _intraday_lock = threading.Lock()
 _intraday_scanning = False
 
 
 def run_intraday_and_store(config: ScannerConfig | None = None) -> dict[str, Any]:
+    from stockscanner.intraday.scanner import run_intraday_scan
+
     global _intraday_scanning
     with _intraday_lock:
         if _intraday_scanning:
@@ -68,6 +65,8 @@ def _result_to_payload(
     fast: bool,
     source: str,
 ) -> dict[str, Any]:
+    from stockscanner.plan import build_trade_plans
+
     plan_cfg = config.plan
     output_cfg = config.output
     plans = build_trade_plans(
@@ -124,6 +123,9 @@ def run_and_store(
     source: str = "manual",
     send_alert: bool = False,
 ) -> dict[str, Any]:
+    from stockscanner.alerts.dispatcher import configured_channels, dispatch_alerts
+    from stockscanner.scanner import run_scan
+
     global _scanning
     cfg = config or ScannerConfig.load()
 
@@ -157,6 +159,8 @@ def review_portfolio(
     *,
     fast: bool = True,
 ) -> dict[str, Any]:
+    from stockscanner.portfolio.review import run_portfolio_review
+
     cfg = config or ScannerConfig.load()
     payload = run_portfolio_review(symbols, cfg, skip_pead=fast)
     payload["status"] = "ok"

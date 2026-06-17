@@ -11,11 +11,11 @@ from pydantic import BaseModel
 
 from stockscanner.config import ROOT, ScannerConfig
 from stockscanner.web import service, store
-from stockscanner.web.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
+PUBLIC_STATIC_DIR = ROOT / "public" / "static"
 
 app = FastAPI(title="Stock Scanner", version="1.0.0")
 _config = ScannerConfig.load()
@@ -42,20 +42,37 @@ class SessionRequest(BaseModel):
 
 @app.on_event("startup")
 def on_startup() -> None:
+    if os.environ.get("VERCEL"):
+        return
     web_cfg = _config.section("web")
-    if web_cfg.get("auto_schedule", True) and not os.environ.get("VERCEL"):
+    if web_cfg.get("auto_schedule", True):
+        from stockscanner.web.scheduler import start_scheduler
+
         start_scheduler(_config)
         logger.info("Scheduler started")
 
 
 @app.on_event("shutdown")
 def on_shutdown() -> None:
+    if os.environ.get("VERCEL"):
+        return
+    from stockscanner.web.scheduler import stop_scheduler
+
     stop_scheduler()
+
+
+@app.get("/api/health")
+def api_health() -> dict:
+    return {"status": "ok", "platform": "vercel" if os.environ.get("VERCEL") else "local"}
 
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    for base in (STATIC_DIR, PUBLIC_STATIC_DIR):
+        path = base / "index.html"
+        if path.exists():
+            return FileResponse(path)
+    raise HTTPException(status_code=500, detail="index.html not found")
 
 
 @app.get("/api/status")
@@ -169,7 +186,9 @@ def api_portfolio_review(body: PortfolioRequest) -> dict:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+_static_dir = STATIC_DIR if STATIC_DIR.exists() else PUBLIC_STATIC_DIR
+if _static_dir.exists() and not os.environ.get("VERCEL"):
+    app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 
 def run_server(host: str | None = None, port: int | None = None) -> None:

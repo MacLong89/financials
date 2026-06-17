@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Scanner</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <h1>Stock Scanner</h1>
+        <p class="subtitle" id="page-subtitle">Empirical swing trade plans</p>
+      </div>
+      <div class="header-actions">
+        <button id="btn-scan" class="btn btn-primary">Run Scan Now</button>
+        <label class="check swing-only" id="fast-wrap">
+          <input type="checkbox" id="chk-fast" checked /> Fast mode
+        </label>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="swing" role="tab" aria-selected="true">Swing</button>
+      <button class="tab" data-tab="intraday" role="tab" aria-selected="false">Intraday</button>
+      <button class="tab" data-tab="portfolio" role="tab" aria-selected="false">Portfolio</button>
+    </nav>
+
+    <!-- Swing tab -->
+    <div id="tab-swing" class="tab-panel active">
+      <section class="cards" id="stats-cards">
+        <div class="card regime-card" id="regime-card">
+          <span class="label">Market Regime</span>
+          <span class="value" id="regime-label">—</span>
+          <span class="meta" id="regime-meta">—</span>
+        </div>
+        <div class="card">
+          <span class="label">Last Scan</span>
+          <span class="value sm" id="last-scan">Never</span>
+          <span class="meta" id="scan-source">—</span>
+        </div>
+        <div class="card">
+          <span class="label">Matches / Plans</span>
+          <span class="value" id="match-count">—</span>
+          <span class="meta" id="plan-rules">Stop — · Target —</span>
+        </div>
+        <div class="card">
+          <span class="label">Auto Schedule</span>
+          <span class="value sm" id="schedule-time">—</span>
+          <span class="meta" id="schedule-tz">Mon–Fri</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Trade Plans</h2>
+          <span id="scan-status" class="status-pill idle">Ready</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Stock</th>
+                <th>Scanner Summary</th>
+                <th>Conf</th>
+                <th>Entry</th>
+                <th>Target</th>
+                <th>Stop</th>
+              </tr>
+            </thead>
+            <tbody id="plans-body">
+              <tr><td colspan="7" class="empty">No data yet. Click Run Scan Now.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Scan History</h2>
+        </div>
+        <ul id="history-list" class="history-list">
+          <li class="empty">No history</li>
+        </ul>
+      </section>
+    </div>
+
+    <!-- Intraday tab -->
+    <div id="tab-intraday" class="tab-panel">
+      <section class="cards">
+        <div class="card">
+          <span class="label">Universe</span>
+          <span class="value sm" id="id-symbols">SPY · QQQ</span>
+          <span class="meta">Index ETFs only</span>
+        </div>
+        <div class="card">
+          <span class="label">Last Refresh</span>
+          <span class="value sm" id="id-last-scan">Never</span>
+          <span class="meta">5-minute bars</span>
+        </div>
+        <div class="card">
+          <span class="label">Setups</span>
+          <span class="value sm" id="id-setup-count">—</span>
+          <span class="meta" id="id-rules">Trade ≥65% · ORB/VWAP only</span>
+        </div>
+        <div class="card disclaimer-card">
+          <span class="label">Play Money Only</span>
+          <span class="value sm">For fun</span>
+          <span class="meta">Studies show most retail day traders lose. Keep size tiny.</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Intraday Setups</h2>
+          <span id="id-scan-status" class="status-pill idle">Ready</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Symbol</th>
+                <th>Setup</th>
+                <th>Bias</th>
+                <th>Summary</th>
+                <th>Conf</th>
+                <th>Entry</th>
+                <th>Target</th>
+                <th>Stop</th>
+                <th>VWAP</th>
+              </tr>
+            </thead>
+            <tbody id="id-plans-body">
+              <tr><td colspan="10" class="empty">No data yet. Click Refresh Intraday.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel-foot">
+          <p><strong>ORB-L/S</strong> — 30-min opening range break with volume ·
+             <strong>VWAP-L/S</strong> — reclaim of VWAP ·
+             <strong>TREND</strong> — above/below VWAP + 9 EMA (watch only) ·
+             <strong>FLAT</strong> — no clear edge</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- Portfolio tab -->
+    <div id="tab-portfolio" class="tab-panel">
+      <section class="cards">
+        <div class="card regime-card" id="pf-regime-card">
+          <span class="label">Market Regime</span>
+          <span class="value sm" id="pf-regime-label">—</span>
+          <span class="meta" id="pf-regime-meta">Run review to update</span>
+        </div>
+        <div class="card">
+          <span class="label">Holdings</span>
+          <span class="value sm" id="pf-count">0</span>
+          <span class="meta">One ticker per line</span>
+        </div>
+        <div class="card">
+          <span class="label">Strong Hold / Hold</span>
+          <span class="value sm" id="pf-ok-count">—</span>
+          <span class="meta" id="pf-risk-count">Trim / Exit —</span>
+        </div>
+        <div class="card">
+          <span class="label">Last Review</span>
+          <span class="value sm" id="pf-last-review">Never</span>
+          <span class="meta">Same 6-signal framework</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Your Holdings</h2>
+          <span id="pf-status" class="status-pill idle">Ready</span>
+        </div>
+        <div class="portfolio-input">
+          <label for="pf-symbols">Tickers</label>
+          <textarea id="pf-symbols" rows="6" placeholder="SPY&#10;QQQ&#10;MU&#10;NVDA&#10;AAPL"></textarea>
+          <div class="portfolio-actions">
+            <button id="btn-pf-save" class="btn">Save List</button>
+            <button id="btn-pf-review" class="btn btn-primary">Rate Holdings</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Hold Ratings</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Rating</th>
+                <th>Signals</th>
+                <th>Conf</th>
+                <th>Price</th>
+                <th>200 MA</th>
+                <th>Why</th>
+              </tr>
+            </thead>
+            <tbody id="pf-body">
+              <tr><td colspan="7" class="empty">Enter tickers above and click Rate Holdings.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel-foot">
+          <p><strong>STRONG HOLD</strong> — 4+/6 signals, ≥72% conf, above 200 MA ·
+             <strong>HOLD</strong> — 3+/6, ≥55% conf, above 200 MA ·
+             <strong>WATCH</strong> — mixed ·
+             <strong>TRIM</strong> — weak momentum or below 200 MA ·
+             <strong>EXIT</strong> — 0–1 signals or broken trend</p>
+        </div>
+      </section>
+    </div>
+
+    <footer class="footer">
+      <span id="footer-signals">JT · GH · IM · PE · 6-1 · TR</span>
+      <span>Research tool only — not financial advice</span>
+    </footer>
+  </div>
+  <script src="/static/app.js?v=6"></script>
+</body>
+</html>
