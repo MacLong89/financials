@@ -86,6 +86,8 @@ def _plan_to_dict(p) -> dict[str, Any]:
     }
     if p.scores:
         row["scores"] = p.scores
+    if p.scores and p.scores.get("fallback"):
+        row["fallback"] = True
     return row
 
 
@@ -100,18 +102,20 @@ def _result_to_payload(
 
     plan_cfg = config.plan
     output_cfg = config.output
+    min_conf = int(plan_cfg.get("min_confidence", 0))
+    min_display_conf = int(plan_cfg.get("min_confidence_display", 0))
     plans = build_trade_plans(
         result.candidates,
         stop_pct=float(plan_cfg.get("stop_pct", 0.075)),
         reward_risk=float(plan_cfg.get("reward_risk", 2.0)),
-        min_confidence=int(plan_cfg.get("min_confidence", 0)),
+        min_confidence=min_conf,
         max_rows=None,
     )
     display_plans = build_trade_plans(
         result.candidates,
         stop_pct=float(plan_cfg.get("stop_pct", 0.075)),
         reward_risk=float(plan_cfg.get("reward_risk", 2.0)),
-        min_confidence=int(plan_cfg.get("min_confidence", 0)),
+        min_confidence=min_display_conf,
         max_rows=int(output_cfg.get("plan_max_rows", 15)),
     )
 
@@ -134,13 +138,15 @@ def _result_to_payload(
             "screened_count": result.screened_count,
             "sector_count": result.sector_count,
             "min_signals_required": result.min_signals_required,
-            "match_count": len(result.candidates),
+            "match_count": result.strict_match_count,
+            "display_count": len(result.candidates),
             "plan_count": len(plans),
         },
         "plan_rules": {
             "stop_pct": float(plan_cfg.get("stop_pct", 0.075)),
             "reward_risk": float(plan_cfg.get("reward_risk", 2.0)),
-            "min_confidence": int(plan_cfg.get("min_confidence", 0)),
+            "min_confidence": min_conf,
+            "fallback_min_rows": int(output_cfg.get("fallback_min_rows", 5)),
         },
         "plans": normalize_plans([_plan_to_dict(p) for p in display_plans]),
         "all_plans": normalize_plans([_plan_to_dict(p) for p in plans]),

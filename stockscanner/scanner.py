@@ -19,6 +19,27 @@ class ScanResult:
     screened_count: int
     sector_count: int
     min_signals_required: int
+    strict_match_count: int = 0
+
+
+def _total_score(candidate: ScanCandidate) -> float:
+    scores = candidate.detail.get("scores")
+    if isinstance(scores, dict) and scores.get("total_score") is not None:
+        return float(scores["total_score"])
+    return float(candidate.score)
+
+
+def _rank_candidates(candidates: list[ScanCandidate]) -> list[ScanCandidate]:
+    return sorted(
+        candidates,
+        key=lambda c: (
+            -_total_score(c),
+            -c.signal_count,
+            -c.score,
+            -c.rs_percentile,
+            c.symbol,
+        ),
+    )
 
 
 def run_scan(
@@ -64,7 +85,8 @@ def run_scan(
     require_setup = bool(setups_cfg.get("require_breakout_or_pullback", False))
 
     eval_ctx = build_evaluation_context(history, config, cache_dir)
-    candidates: list[ScanCandidate] = []
+    strict: list[ScanCandidate] = []
+    all_evaluated: list[ScanCandidate] = []
 
     for symbol in eval_ctx.liquidity_symbols:
         df = history[symbol]
@@ -76,17 +98,27 @@ def run_scan(
             config=config,
             skip_pead=skip_pead,
         )
-        if candidate is None or candidate.signal_count < min_pass:
+        if candidate is None:
             continue
-
+        all_evaluated.append(candidate)
+        if candidate.signal_count < min_pass:
+            continue
         if require_setup and not (candidate.setup_breakout or candidate.setup_pullback):
             continue
+        strict.append(candidate)
 
-        candidates.append(candidate)
+    strict = _rank_candidates(strict)
+    strict_match_count = len(strict)
 
-    candidates.sort(
-        key=lambda c: (-c.signal_count, -c.score, -c.rs_percentile, c.symbol),
-    )
+    fallback_min = int(output_cfg.get("fallback_min_rows", 5))
+    candidates = list(strict)
+    if len(candidates) < fallback_min:
+        strict_symbols = {c.symbol for c in candidates}
+        pool = [c for c in _rank_candidates(all_evaluated) if c.symbol not in strict_symbols]
+        for c in pool[: max(0, fallback_min - len(candidates))]:
+            c.detail["fallback"] = True
+            candidates.append(c)
+
     top_n = int(output_cfg.get("top_n", 50))
     return ScanResult(
         regime=regime,
@@ -95,4 +127,5 @@ def run_scan(
         screened_count=len(eval_ctx.liquidity_symbols),
         sector_count=len(eval_ctx.sector_rank),
         min_signals_required=min_pass,
+        strict_match_count=strict_match_count,
     )

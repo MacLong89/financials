@@ -44,7 +44,9 @@ def _summary(candidate: ScanCandidate) -> str:
     chart = _chart_label(candidate)
     base = f"{candidate.signal_count}/6 {sig} · {candidate.confirmer_count}/4 {cfm}"
     if chart != "-":
-        return f"{base} | {chart}"
+        base = f"{base} | {chart}"
+    if candidate.detail.get("fallback"):
+        base = f"{base} · best available"
     return base
 
 
@@ -74,6 +76,8 @@ def build_trade_plan(
     stop = round(entry * (1.0 - stop_pct), 2)
     target = round(entry * (1.0 + stop_pct * reward_risk), 2)
     scores = candidate.detail.get("scores")
+    if isinstance(scores, dict) and candidate.detail.get("fallback"):
+        scores = {**scores, "fallback": True}
     return TradePlan(
         priority=priority,
         symbol=candidate.symbol,

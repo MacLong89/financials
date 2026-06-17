@@ -96,6 +96,8 @@ body {
 .setup-error { color: var(--red); font-weight: 600; }
 .row-tradeable { background: #0f1a14; }
 .row-tradeable td.setup-trigger { color: var(--green); }
+.row-fallback { opacity: 0.85; }
+.row-fallback td.summary-cell { color: var(--muted); }
 .conf-high { color: var(--green); font-weight: 600; }
 
 .portfolio-input {

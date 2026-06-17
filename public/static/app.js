@@ -140,8 +140,9 @@ function renderPlans(data) {
   body.innerHTML = plans.map((p) => {
     const s = p.scores || {};
     const total = s.total_score ?? p.confidence_exact ?? p.confidence;
+    const rowCls = p.fallback || s.fallback ? ' class="row-fallback"' : "";
     return `
-    <tr>
+    <tr${rowCls}>
       <td class="priority">${p.priority}</td>
       <td><strong>${p.stock}</strong></td>
       <td class="summary-cell">${p.summary}</td>
@@ -241,7 +242,7 @@ function renderDashboard(payload) {
 
   $("last-scan").textContent = fmtTime(payload.ran_at);
   $("scan-source").textContent = payload.source ? `via ${payload.source}` : "—";
-  $("match-count").textContent = `${stats.match_count ?? "—"} / ${stats.plan_count ?? "—"}`;
+  $("match-count").textContent = `${stats.match_count ?? "—"} strict · ${stats.display_count ?? stats.plan_count ?? "—"} shown`;
 
   const stopPct = ((rules.stop_pct || 0) * 100).toFixed(1);
   const rr = rules.reward_risk || 2;

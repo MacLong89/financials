@@ -70,6 +70,7 @@ scoring:
 
 output:
   top_n: 50
+  fallback_min_rows: 5    # always show at least this many (best scores) even if below 4/6
   plan_max_rows: 15       # rows shown in terminal plan table
   cache_dir: data/cache
   cache_max_age_hours: 4
@@ -77,7 +78,8 @@ output:
 plan:
   stop_pct: 0.075
   reward_risk: 2.0
-  min_confidence: 72       # filters weak plans after graded confidence
+  min_confidence: 72       # strict filter for alerts / match stats
+  min_confidence_display: 0  # show plans in UI even when below min_confidence
 
 alerts:
   mode: new
