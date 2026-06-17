@@ -2,6 +2,44 @@ const $ = (id) => document.getElementById(id);
 
 let activeTab = "swing";
 
+const LS_PORTFOLIO = "stockscanner.portfolio";
+const LS_SESSION = "stockscanner.session";
+
+function readPortfolioLocal() {
+  try {
+    const raw = localStorage.getItem(LS_PORTFOLIO);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePortfolioLocal(payload) {
+  try {
+    localStorage.setItem(LS_PORTFOLIO, JSON.stringify(payload));
+  } catch (_) { /* private mode / quota */ }
+}
+
+function readSessionLocal() {
+  try {
+    const raw = localStorage.getItem(LS_SESSION);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionLocal(patch) {
+  const next = {
+    ...(readSessionLocal() || {}),
+    ...patch,
+    updated_at: new Date().toISOString(),
+  };
+  try {
+    localStorage.setItem(LS_SESSION, JSON.stringify(next));
+  } catch (_) { /* private mode / quota */ }
+}
+
 function fmtMoney(n) {
   if (n == null || n === 0) return "—";
   return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -228,7 +266,18 @@ function updatePortfolioCount() {
   $("pf-count").textContent = parseSymbols($("pf-symbols").value).length;
 }
 
+function persistPortfolioSymbolsLocally() {
+  const symbols = parseSymbols($("pf-symbols").value);
+  const local = readPortfolioLocal();
+  writePortfolioLocal({
+    symbols,
+    updated_at: new Date().toISOString(),
+    last_review: local?.last_review,
+  });
+}
+
 async function saveSession(patch = {}) {
+  writeSessionLocal(patch);
   try {
     await fetch("/api/session", {
       method: "PUT",
@@ -245,15 +294,32 @@ function schedulePortfolioSave() {
 }
 
 async function loadPortfolio() {
+  const local = readPortfolioLocal();
+  if (local?.symbols?.length) {
+    $("pf-symbols").value = local.symbols.join("\n");
+    updatePortfolioCount();
+    if (local.last_review) renderPortfolio(local.last_review);
+  }
+
   try {
     const res = await fetch("/api/portfolio");
     const data = await res.json();
-    if (data.symbols?.length) {
+    const localUpdated = local?.updated_at ? Date.parse(local.updated_at) : 0;
+    const serverUpdated = data.updated_at ? Date.parse(data.updated_at) : 0;
+
+    if (data.symbols?.length && serverUpdated > localUpdated) {
       $("pf-symbols").value = data.symbols.join("\n");
       updatePortfolioCount();
+      writePortfolioLocal({
+        symbols: data.symbols,
+        updated_at: data.updated_at,
+        last_review: data.last_review || local?.last_review,
+      });
     }
-    if (data.last_review) renderPortfolio(data.last_review);
-  } catch (_) { /* ignore */ }
+    if (data.last_review && serverUpdated >= localUpdated) {
+      renderPortfolio(data.last_review);
+    }
+  } catch (_) { /* server unavailable — local copy already applied */ }
 }
 
 function applySession(session) {
@@ -266,6 +332,13 @@ function applySession(session) {
 
 async function savePortfolio(silent = false) {
   const symbols = parseSymbols($("pf-symbols").value);
+  const local = readPortfolioLocal();
+  writePortfolioLocal({
+    symbols,
+    updated_at: new Date().toISOString(),
+    last_review: local?.last_review,
+  });
+
   if (!silent) setStatus("Saving…", "running", "portfolio");
   try {
     await fetch("/api/portfolio", {
@@ -279,9 +352,10 @@ async function savePortfolio(silent = false) {
       setTimeout(() => setStatus("Ready", "idle", "portfolio"), 2000);
     }
   } catch (e) {
+    updatePortfolioCount();
     if (!silent) {
-      setStatus("Error", "idle", "portfolio");
-      alert(e.message);
+      setStatus("Saved locally", "done", "portfolio");
+      setTimeout(() => setStatus("Ready", "idle", "portfolio"), 2000);
     }
   }
 }
@@ -317,6 +391,11 @@ async function runPortfolioReview() {
 
     const data = await res.json();
     renderPortfolio(data);
+    writePortfolioLocal({
+      symbols,
+      updated_at: new Date().toISOString(),
+      last_review: data,
+    });
     setStatus("Done", "done", "portfolio");
   } catch (e) {
     setStatus("Error", "idle", "portfolio");
@@ -391,7 +470,13 @@ async function loadStatus() {
 
   if (data.latest) renderDashboard(data.latest);
   if (data.intraday) renderIntraday(data.intraday);
-  if (data.session) applySession(data.session);
+
+  const localSession = readSessionLocal();
+  if (data.session) {
+    const localT = localSession?.updated_at ? Date.parse(localSession.updated_at) : 0;
+    const serverT = data.session.updated_at ? Date.parse(data.session.updated_at) : 0;
+    if (serverT > localT) applySession(data.session);
+  }
 }
 
 async function loadHistory() {
@@ -501,10 +586,12 @@ $("btn-pf-save").addEventListener("click", () => savePortfolio(false));
 $("btn-pf-review").addEventListener("click", runPortfolioReview);
 $("pf-symbols").addEventListener("input", () => {
   updatePortfolioCount();
+  persistPortfolioSymbolsLocally();
   schedulePortfolioSave();
 });
 $("chk-fast").addEventListener("change", () => saveSession({ fast_mode: $("chk-fast").checked }));
 
+applySession(readSessionLocal());
 loadStatus();
 loadHistory();
 loadPortfolio();
