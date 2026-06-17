@@ -95,9 +95,13 @@ web:
   auto_schedule: true
   schedule_hour: 7
   schedule_minute: 30
-  timezone: America/Denver
+  timezone: America/Denver   # Mountain Time (MST/MDT)
   schedule_fast: true
   schedule_alert: true
+  schedule_swing: true
+  schedule_portfolio: true
+  schedule_intraday: true
+  schedule_reversal: false
 
 intraday:
   symbols:

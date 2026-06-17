@@ -7,6 +7,7 @@ from typing import Any
 from stockscanner.config import ScannerConfig
 from stockscanner.web.store import (
     load_intraday,
+    load_portfolio,
     load_reversal,
     normalize_plans,
     save_intraday,
@@ -198,3 +199,64 @@ def review_portfolio(
     save_portfolio(symbols)
     save_portfolio_review(payload)
     return payload
+
+
+def run_morning_routine(
+    config: ScannerConfig | None = None,
+    *,
+    send_alert: bool | None = None,
+) -> dict[str, Any]:
+    """Run scheduled morning jobs (swing, portfolio, intraday, reversal)."""
+    cfg = config or ScannerConfig.load()
+    web_cfg = cfg.section("web")
+    fast = bool(web_cfg.get("schedule_fast", True))
+    alert = (
+        bool(web_cfg.get("schedule_alert", True))
+        if send_alert is None
+        else send_alert
+    )
+
+    results: dict[str, Any] = {
+        "ran_at": datetime.now(timezone.utc).isoformat(),
+        "source": "scheduled",
+        "jobs": {},
+    }
+
+    if web_cfg.get("schedule_swing", True):
+        try:
+            results["jobs"]["swing"] = run_and_store(
+                cfg,
+                fast=fast,
+                source="scheduled",
+                send_alert=alert,
+            )
+        except Exception as exc:
+            results["jobs"]["swing"] = {"status": "error", "detail": str(exc)}
+
+    if web_cfg.get("schedule_portfolio", True):
+        symbols = load_portfolio().get("symbols") or []
+        if symbols:
+            try:
+                results["jobs"]["portfolio"] = review_portfolio(symbols, cfg, fast=fast)
+            except Exception as exc:
+                results["jobs"]["portfolio"] = {"status": "error", "detail": str(exc)}
+        else:
+            results["jobs"]["portfolio"] = {
+                "status": "skipped",
+                "message": "No saved holdings",
+            }
+
+    if web_cfg.get("schedule_intraday", True):
+        try:
+            results["jobs"]["intraday"] = run_intraday_and_store(cfg)
+        except Exception as exc:
+            results["jobs"]["intraday"] = {"status": "error", "detail": str(exc)}
+
+    if web_cfg.get("schedule_reversal", False):
+        try:
+            results["jobs"]["reversal"] = run_reversal_and_store(cfg)
+        except Exception as exc:
+            results["jobs"]["reversal"] = {"status": "error", "detail": str(exc)}
+
+    results["status"] = "ok"
+    return results

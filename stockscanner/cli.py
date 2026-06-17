@@ -218,6 +218,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("regime", help="Show SPY 200 MA regime only")
     sub.add_parser("alert-test", help="Send a test message to configured channels")
 
+    morning = sub.add_parser(
+        "morning",
+        help="Run all morning jobs (swing, portfolio, intraday) — for Task Scheduler",
+    )
+    morning.add_argument("--config", type=Path, default=None)
+    morning.add_argument("--no-alert", action="store_true")
+
     web = sub.add_parser("web", help="Start web dashboard")
     web.add_argument("--host", default=None)
     web.add_argument("--port", type=int, default=None)
@@ -274,6 +281,25 @@ def main(argv: list[str] | None = None) -> int:
         alert_result = send_test_alerts(config)
         _print_alert_result(alert_result)
         return 0 if alert_result.sent and not alert_result.errors else 1
+
+    if args.command == "morning":
+        from stockscanner.web.service import run_morning_routine
+
+        web_cfg = config.section("web")
+        console.print(
+            f"[bold]Morning routine[/bold] "
+            f"({web_cfg.get('schedule_hour', 7):02d}:"
+            f"{web_cfg.get('schedule_minute', 30):02d} "
+            f"{web_cfg.get('timezone', 'America/Denver')})"
+        )
+        result = run_morning_routine(
+            config,
+            send_alert=not args.no_alert,
+        )
+        for name, job in (result.get("jobs") or {}).items():
+            status = job.get("status", "ok")
+            console.print(f"  {name}: [green]{status}[/green]" if status == "ok" else f"  {name}: [yellow]{status}[/yellow]")
+        return 0
 
     if args.command == "web":
         from stockscanner.web.app import run_server

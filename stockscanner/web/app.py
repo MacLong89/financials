@@ -4,7 +4,7 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -96,6 +96,12 @@ def api_status() -> dict:
             "time": f"{web_cfg.get('schedule_hour', 7):02d}:{web_cfg.get('schedule_minute', 30):02d}",
             "timezone": web_cfg.get("timezone", "America/Denver"),
             "weekdays": "Mon-Fri",
+            "jobs": {
+                "swing": web_cfg.get("schedule_swing", True),
+                "portfolio": web_cfg.get("schedule_portfolio", True),
+                "intraday": web_cfg.get("schedule_intraday", True),
+                "reversal": web_cfg.get("schedule_reversal", False),
+            },
         },
     }
 
@@ -136,6 +142,27 @@ def api_scan(body: ScanRequest | None = None) -> dict:
         )
     except Exception as exc:
         logger.exception("Scan failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+def _verify_cron_secret(request: Request) -> None:
+    secret = os.environ.get("CRON_SECRET")
+    if not secret:
+        return
+    auth = request.headers.get("Authorization", "")
+    if auth != f"Bearer {secret}":
+        raise HTTPException(status_code=403, detail="Invalid cron secret")
+
+
+@app.get("/api/cron/morning")
+@app.post("/api/cron/morning")
+def api_cron_morning(request: Request) -> dict:
+    """Vercel Cron / external scheduler — runs full morning routine."""
+    _verify_cron_secret(request)
+    try:
+        return service.run_morning_routine(_config)
+    except Exception as exc:
+        logger.exception("Morning cron failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

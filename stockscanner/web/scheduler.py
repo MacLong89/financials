@@ -6,7 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from stockscanner.config import ScannerConfig
-from stockscanner.web.service import run_and_store
+from stockscanner.web.service import run_morning_routine
 
 logger = logging.getLogger(__name__)
 
@@ -18,21 +18,21 @@ def start_scheduler(config: ScannerConfig) -> BackgroundScheduler:
     if _scheduler is not None:
         return _scheduler
 
-    hour = int(config.section("web").get("schedule_hour", 7))
-    minute = int(config.section("web").get("schedule_minute", 30))
-    tz = config.section("web").get("timezone", "America/Denver")
-    send_alert = bool(config.section("web").get("schedule_alert", True))
-    fast = bool(config.section("web").get("schedule_fast", True))
+    web_cfg = config.section("web")
+    hour = int(web_cfg.get("schedule_hour", 7))
+    minute = int(web_cfg.get("schedule_minute", 30))
+    tz = web_cfg.get("timezone", "America/Denver")
+    send_alert = bool(web_cfg.get("schedule_alert", True))
 
     scheduler = BackgroundScheduler(timezone=tz)
 
     def _job() -> None:
-        logger.info("Scheduled scan starting")
+        logger.info("Scheduled morning routine starting")
         try:
-            run_and_store(config, fast=fast, source="scheduled", send_alert=send_alert)
-            logger.info("Scheduled scan complete")
+            run_morning_routine(config, send_alert=send_alert)
+            logger.info("Scheduled morning routine complete")
         except Exception:
-            logger.exception("Scheduled scan failed")
+            logger.exception("Scheduled morning routine failed")
 
     scheduler.add_job(
         _job,
@@ -42,7 +42,7 @@ def start_scheduler(config: ScannerConfig) -> BackgroundScheduler:
             minute=minute,
             timezone=tz,
         ),
-        id="morning_scan",
+        id="morning_routine",
         replace_existing=True,
     )
     scheduler.start()
